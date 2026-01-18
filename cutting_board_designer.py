@@ -231,11 +231,14 @@ def draw_3d_preview(strips, board_width, board_length, board_thickness=1.5):
     # Set the aspect ratio and labels
     ax.set_xlim(0, board_width)
     ax.set_ylim(0, board_length)
-    ax.set_zlim(0, board_thickness * 2)
+    ax.set_zlim(0, board_thickness)
     ax.set_xlabel('Width (inches)', fontsize=10)
     ax.set_ylabel('Length (inches)', fontsize=10)
     ax.set_zlabel('Thickness (inches)', fontsize=10)
     ax.set_title(f'3D Preview - Thickness: {board_thickness}"', fontsize=14, fontweight='bold')
+
+    # Set equal aspect ratio for realistic proportions
+    ax.set_box_aspect([board_width, board_length, board_thickness])
 
     # Set viewing angle
     ax.view_init(elev=20, azim=45)
