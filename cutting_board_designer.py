@@ -341,6 +341,8 @@ if 'history' not in st.session_state:
     st.session_state.history_index = -1
 if 'unit' not in st.session_state:
     st.session_state.unit = "inches"
+if 'design_name' not in st.session_state:
+    st.session_state.design_name = "cutting_board_design"
 
 # Measurement unit selector
 st.sidebar.subheader("Settings")
@@ -535,10 +537,20 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.subheader("Save/Load Design")
 
+# Design name input
+design_name = st.sidebar.text_input(
+    "Design Name",
+    value=st.session_state.design_name,
+    key="design_name_input",
+    help="This name will be used as a prefix for all saved files"
+)
+st.session_state.design_name = design_name
+
 # Export design as JSON
 import json
 
 design_data = {
+    'design_name': design_name,
     'board_width': board_width,
     'board_length': board_length,
     'strips': st.session_state.strips
@@ -548,7 +560,7 @@ design_json = json.dumps(design_data, indent=2)
 st.sidebar.download_button(
     label="💾 Save Design (JSON)",
     data=design_json,
-    file_name="cutting_board_design.json",
+    file_name=f"{design_name}.json",
     mime="application/json"
 )
 
@@ -558,6 +570,7 @@ if uploaded_file is not None:
     try:
         loaded_data = json.load(uploaded_file)
         st.session_state.strips = loaded_data.get('strips', st.session_state.strips)
+        st.session_state.design_name = loaded_data.get('design_name', 'cutting_board_design')
         st.success("Design loaded successfully!")
         st.rerun()
     except Exception as e:
@@ -596,7 +609,7 @@ with tab1:
         st.download_button(
             label="📥 Download Edge Grain Preview (PNG)",
             data=buf,
-            file_name="cutting_board_edge_grain.png",
+            file_name=f"{st.session_state.design_name}_edge_grain.png",
             mime="image/png"
         )
     else:
@@ -617,7 +630,7 @@ with tab2:
         st.download_button(
             label="📥 Download End Grain Preview (PNG)",
             data=buf,
-            file_name="cutting_board_end_grain.png",
+            file_name=f"{st.session_state.design_name}_end_grain.png",
             mime="image/png"
         )
     else:
@@ -648,7 +661,7 @@ with tab3:
         st.download_button(
             label="📥 Download 3D Preview (PNG)",
             data=buf,
-            file_name="cutting_board_3d.png",
+            file_name=f"{st.session_state.design_name}_3d.png",
             mime="image/png"
         )
     else:
@@ -667,7 +680,7 @@ with tab4:
         st.download_button(
             label="📥 Download Schematic (PDF)",
             data=buf_pdf,
-            file_name="cutting_board_schematic.pdf",
+            file_name=f"{st.session_state.design_name}_schematic.pdf",
             mime="application/pdf"
         )
 
@@ -678,7 +691,7 @@ with tab4:
         st.download_button(
             label="📥 Download Schematic (PNG)",
             data=buf_png,
-            file_name="cutting_board_schematic.png",
+            file_name=f"{st.session_state.design_name}_schematic.png",
             mime="image/png"
         )
     else:
