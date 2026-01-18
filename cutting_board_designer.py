@@ -538,19 +538,18 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("Save/Load Design")
 
 # Design name input
-design_name = st.sidebar.text_input(
+st.session_state.design_name = st.sidebar.text_input(
     "Design Name",
     value=st.session_state.design_name,
     key="design_name_input",
     help="This name will be used as a prefix for all saved files"
 )
-st.session_state.design_name = design_name
 
 # Export design as JSON
 import json
 
 design_data = {
-    'design_name': design_name,
+    'design_name': st.session_state.design_name,
     'board_width': board_width,
     'board_length': board_length,
     'strips': st.session_state.strips
@@ -560,7 +559,7 @@ design_json = json.dumps(design_data, indent=2)
 st.sidebar.download_button(
     label="💾 Save Design (JSON)",
     data=design_json,
-    file_name=f"{design_name}.json",
+    file_name=f"{st.session_state.design_name}.json",
     mime="application/json"
 )
 
