@@ -20,16 +20,22 @@ WOOD_TYPES = {
     "Red Oak": "#C19A6B",
 }
 
-# Board dimensions
-BOARD_LENGTH = 18  # inches
-BOARD_WIDTH = 12   # inches
+# Board size presets (width x length in inches)
+BOARD_PRESETS = {
+    "Small (8\" × 12\")": (8, 12),
+    "Medium (10\" × 14\")": (10, 14),
+    "Standard (12\" × 18\")": (12, 18),
+    "Large (14\" × 20\")": (14, 20),
+    "Extra Large (16\" × 24\")": (16, 24),
+    "Custom": None
+}
 
 def calculate_total_width(strips):
     """Calculate total width"""
     total = sum(strip['width'] for strip in strips)
     return total
 
-def draw_board_preview(strips):
+def draw_board_preview(strips, board_width, board_length):
     """Draw a visual preview of the cutting board"""
     fig, ax = plt.subplots(figsize=(12, 8))
 
@@ -39,7 +45,7 @@ def draw_board_preview(strips):
         rect = patches.Rectangle(
             (current_x, 0),
             strip['width'],
-            BOARD_LENGTH,
+            board_length,
             linewidth=1,
             edgecolor='black',
             facecolor=strip['color']
@@ -49,7 +55,7 @@ def draw_board_preview(strips):
         # Add wood type label
         ax.text(
             current_x + strip['width']/2,
-            BOARD_LENGTH/2,
+            board_length/2,
             strip['wood_type'],
             ha='center',
             va='center',
@@ -61,8 +67,8 @@ def draw_board_preview(strips):
 
         current_x += strip['width']
 
-    ax.set_xlim(0, BOARD_WIDTH)
-    ax.set_ylim(0, BOARD_LENGTH)
+    ax.set_xlim(0, board_width)
+    ax.set_ylim(0, board_length)
     ax.set_aspect('equal')
     ax.set_xlabel('Width (inches)', fontsize=12)
     ax.set_ylabel('Length (inches)', fontsize=12)
@@ -71,7 +77,7 @@ def draw_board_preview(strips):
 
     return fig
 
-def draw_schematic(strips):
+def draw_schematic(strips, board_width, board_length):
     """Draw a dimensioned schematic for cutting"""
     fig, ax = plt.subplots(figsize=(14, 10))
 
@@ -81,7 +87,7 @@ def draw_schematic(strips):
         rect = patches.Rectangle(
             (current_x, 0),
             strip['width'],
-            BOARD_LENGTH,
+            board_length,
             linewidth=2,
             edgecolor='black',
             facecolor=strip['color'],
@@ -92,7 +98,7 @@ def draw_schematic(strips):
         # Add wood type and width label inside strip
         ax.text(
             current_x + strip['width']/2,
-            BOARD_LENGTH/2,
+            board_length/2,
             f"{strip['wood_type']}\n{strip['width']}\"",
             ha='center',
             va='center',
@@ -102,7 +108,7 @@ def draw_schematic(strips):
         )
 
         # Add dimension line above
-        dimension_y = BOARD_LENGTH + 1
+        dimension_y = board_length + 1
         ax.plot([current_x, current_x + strip['width']],
                 [dimension_y, dimension_y], 'k-', linewidth=1.5)
         ax.plot([current_x, current_x],
@@ -118,10 +124,10 @@ def draw_schematic(strips):
     total_width = calculate_total_width(strips)
 
     # Right side dimension line
-    ax.plot([total_width + 1, total_width + 1], [0, BOARD_LENGTH], 'k-', linewidth=2)
+    ax.plot([total_width + 1, total_width + 1], [0, board_length], 'k-', linewidth=2)
     ax.plot([total_width + 0.8, total_width + 1.2], [0, 0], 'k-', linewidth=2)
-    ax.plot([total_width + 0.8, total_width + 1.2], [BOARD_LENGTH, BOARD_LENGTH], 'k-', linewidth=2)
-    ax.text(total_width + 1.5, BOARD_LENGTH/2, f'{BOARD_LENGTH}"',
+    ax.plot([total_width + 0.8, total_width + 1.2], [board_length, board_length], 'k-', linewidth=2)
+    ax.text(total_width + 1.5, board_length/2, f'{board_length}"',
             ha='left', va='center', fontsize=12, fontweight='bold', rotation=270)
 
     # Bottom dimension line
@@ -131,8 +137,8 @@ def draw_schematic(strips):
     ax.text(total_width/2, -1.5, f'Total: {total_width:.3f}"',
             ha='center', fontsize=12, fontweight='bold')
 
-    ax.set_xlim(-2, BOARD_WIDTH + 3)
-    ax.set_ylim(-3, BOARD_LENGTH + 3)
+    ax.set_xlim(-2, board_width + 3)
+    ax.set_ylim(-3, board_length + 3)
     ax.set_aspect('equal')
     ax.axis('off')
     ax.set_title('Cutting Board Schematic with Dimensions', fontsize=16, fontweight='bold', pad=20)
@@ -142,7 +148,7 @@ def draw_schematic(strips):
     ax.text(-1.5, cut_list_y, 'CUT LIST:', fontsize=11, fontweight='bold')
     for i, strip in enumerate(strips):
         ax.text(-1.5, cut_list_y - 0.5 * (i + 1),
-                f'{i+1}. {strip["wood_type"]}: {strip["width"]}" × {BOARD_LENGTH}"',
+                f'{i+1}. {strip["wood_type"]}: {strip["width"]}" × {board_length}"',
                 fontsize=9)
 
     return fig
@@ -162,6 +168,42 @@ if 'strips' not in st.session_state:
         {'wood_type': 'Walnut', 'width': 1.5, 'color': WOOD_TYPES['Walnut']},
         {'wood_type': 'Maple', 'width': 2.0, 'color': WOOD_TYPES['Maple']},
     ]
+
+# Board size selection
+st.sidebar.subheader("Board Size")
+size_preset = st.sidebar.selectbox(
+    "Size Preset",
+    options=list(BOARD_PRESETS.keys()),
+    index=2  # Default to "Standard (12" × 18")"
+)
+
+if BOARD_PRESETS[size_preset] is None:
+    # Custom size
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        board_width = st.number_input(
+            "Width (in)",
+            min_value=4.0,
+            max_value=30.0,
+            value=12.0,
+            step=0.5,
+            key="custom_width"
+        )
+    with col2:
+        board_length = st.number_input(
+            "Length (in)",
+            min_value=6.0,
+            max_value=36.0,
+            value=18.0,
+            step=0.5,
+            key="custom_length"
+        )
+else:
+    # Use preset
+    board_width, board_length = BOARD_PRESETS[size_preset]
+    st.sidebar.info(f"Board: {board_width}\" × {board_length}\"")
+
+st.sidebar.markdown("---")
 
 # Number of strips
 num_strips = st.sidebar.number_input(
@@ -204,7 +246,7 @@ for i in range(num_strips):
         width = st.number_input(
             "Width (in)",
             min_value=0.25,
-            max_value=12.0,
+            max_value=float(board_width),
             value=float(st.session_state.strips[i]['width']),
             step=0.25,
             key=f"width_{i}"
@@ -215,7 +257,7 @@ for i in range(num_strips):
 
 # Calculate total width
 total_width = calculate_total_width(st.session_state.strips)
-width_remaining = BOARD_WIDTH - total_width
+width_remaining = board_width - total_width
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Summary")
@@ -235,8 +277,8 @@ tab1, tab2 = st.tabs(["📊 Preview", "📐 Schematic"])
 
 with tab1:
     st.subheader("Board Preview")
-    if total_width <= BOARD_WIDTH:
-        fig_preview = draw_board_preview(st.session_state.strips)
+    if total_width <= board_width:
+        fig_preview = draw_board_preview(st.session_state.strips, board_width, board_length)
         st.pyplot(fig_preview)
 
         # Download preview
@@ -254,8 +296,8 @@ with tab1:
 
 with tab2:
     st.subheader("Dimensioned Schematic")
-    if total_width <= BOARD_WIDTH:
-        fig_schematic = draw_schematic(st.session_state.strips)
+    if total_width <= board_width:
+        fig_schematic = draw_schematic(st.session_state.strips, board_width, board_length)
         st.pyplot(fig_schematic)
 
         # Download schematic as PDF
@@ -286,13 +328,14 @@ with tab2:
 with st.expander("ℹ️ How to Use"):
     st.markdown("""
     ### Instructions
-    1. **Select number of strips** in the sidebar
-    2. **Choose wood type** for each strip from the dropdown
-    3. **Set width** for each strip (in inches)
-    4. **Monitor total width** - should not exceed 12 inches
-    5. **View Preview** to see what your board will look like
-    6. **View Schematic** to get dimensioned drawings for cutting
-    7. **Download** the schematic as PDF or PNG to print
+    1. **Select board size** - choose from presets or use custom dimensions
+    2. **Select number of strips** in the sidebar
+    3. **Choose wood type** for each strip from the dropdown
+    4. **Set width** for each strip (in inches)
+    5. **Monitor total width** - should not exceed your board width
+    6. **View Preview** to see what your board will look like
+    7. **View Schematic** to get dimensioned drawings for cutting
+    8. **Download** the schematic as PDF or PNG to print
 
     ### Tips
     - Use contrasting woods for visual appeal (light/dark alternating)
