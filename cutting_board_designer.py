@@ -2,8 +2,11 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.backends.backend_pdf import PdfPages
+from mpl_toolkits.mplot3d import Axes3D
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import io
 import copy
+import numpy as np
 
 # Wood type library with realistic colors
 WOOD_TYPES = {
@@ -49,22 +52,71 @@ def calculate_total_width(strips):
     total = sum(strip['width'] for strip in strips)
     return total
 
-def draw_board_preview(strips, board_width, board_length):
+def add_wood_grain_texture(ax, x, y, width, height, color, orientation='vertical'):
+    """Add wood grain texture effect to a rectangle"""
+    # Create grain lines
+    num_lines = int(width * 5) if orientation == 'vertical' else int(height * 5)
+    for _ in range(num_lines):
+        if orientation == 'vertical':
+            line_x = x + np.random.uniform(0, width)
+            line_y_start = y + np.random.uniform(0, height * 0.2)
+            line_y_end = y + np.random.uniform(height * 0.8, height)
+            ax.plot([line_x, line_x], [line_y_start, line_y_end],
+                   color='black', alpha=0.05, linewidth=0.5)
+        else:
+            line_y = y + np.random.uniform(0, height)
+            line_x_start = x + np.random.uniform(0, width * 0.2)
+            line_x_end = x + np.random.uniform(width * 0.8, width)
+            ax.plot([line_x_start, line_x_end], [line_y, line_y],
+                   color='black', alpha=0.05, linewidth=0.5)
+
+def draw_board_preview(strips, board_width, board_length, show_grain=False, corner_radius=0):
     """Draw a visual preview of the cutting board"""
     fig, ax = plt.subplots(figsize=(12, 8))
 
     current_x = 0
     for i, strip in enumerate(strips):
-        # Draw the wood strip
-        rect = patches.Rectangle(
-            (current_x, 0),
-            strip['width'],
-            board_length,
-            linewidth=1,
-            edgecolor='black',
-            facecolor=strip['color']
-        )
+        # Draw the wood strip with optional rounded corners
+        if corner_radius > 0 and (i == 0 or i == len(strips) - 1):
+            # Create rounded rectangle for edge strips
+            from matplotlib.patches import FancyBboxPatch
+            if i == 0:
+                # Left edge - round left side
+                rect = FancyBboxPatch(
+                    (current_x, 0),
+                    strip['width'],
+                    board_length,
+                    boxstyle=f"round,pad=0,rounding_size={corner_radius}",
+                    linewidth=1,
+                    edgecolor='black',
+                    facecolor=strip['color']
+                )
+            else:
+                # Right edge - round right side
+                rect = FancyBboxPatch(
+                    (current_x, 0),
+                    strip['width'],
+                    board_length,
+                    boxstyle=f"round,pad=0,rounding_size={corner_radius}",
+                    linewidth=1,
+                    edgecolor='black',
+                    facecolor=strip['color']
+                )
+        else:
+            rect = patches.Rectangle(
+                (current_x, 0),
+                strip['width'],
+                board_length,
+                linewidth=1,
+                edgecolor='black',
+                facecolor=strip['color']
+            )
         ax.add_patch(rect)
+
+        # Add wood grain texture if enabled
+        if show_grain:
+            add_wood_grain_texture(ax, current_x, 0, strip['width'], board_length,
+                                  strip['color'], orientation='vertical')
 
         # Add wood type label
         ax.text(
@@ -86,8 +138,107 @@ def draw_board_preview(strips, board_width, board_length):
     ax.set_aspect('equal')
     ax.set_xlabel('Width (inches)', fontsize=12)
     ax.set_ylabel('Length (inches)', fontsize=12)
-    ax.set_title('Cutting Board Preview', fontsize=14, fontweight='bold')
+    ax.set_title('Cutting Board Preview - Edge Grain', fontsize=14, fontweight='bold')
     ax.grid(True, alpha=0.3)
+
+    return fig
+
+def draw_end_grain_preview(strips, board_width, board_length, show_grain=False):
+    """Draw end grain pattern (rotated 90 degrees)"""
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    # For end grain, we show the strips as horizontal bands
+    current_y = 0
+    for i, strip in enumerate(strips):
+        rect = patches.Rectangle(
+            (0, current_y),
+            board_length,  # Length becomes the horizontal dimension
+            strip['width'],  # Width becomes the vertical dimension
+            linewidth=1,
+            edgecolor='black',
+            facecolor=strip['color']
+        )
+        ax.add_patch(rect)
+
+        # Add wood grain texture if enabled (horizontal for end grain)
+        if show_grain:
+            add_wood_grain_texture(ax, 0, current_y, board_length, strip['width'],
+                                  strip['color'], orientation='horizontal')
+
+        # Add wood type label
+        ax.text(
+            board_length/2,
+            current_y + strip['width']/2,
+            strip['wood_type'],
+            ha='center',
+            va='center',
+            fontsize=10,
+            rotation=0,
+            fontweight='bold',
+            color='white' if strip['wood_type'] in ['Walnut', 'Wenge', 'Purpleheart', 'Bloodwood'] else 'black'
+        )
+
+        current_y += strip['width']
+
+    ax.set_xlim(0, board_length)
+    ax.set_ylim(0, board_width)
+    ax.set_aspect('equal')
+    ax.set_xlabel('Length (inches)', fontsize=12)
+    ax.set_ylabel('Width (inches)', fontsize=12)
+    ax.set_title('Cutting Board Preview - End Grain', fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3)
+
+    return fig
+
+def draw_3d_preview(strips, board_width, board_length, board_thickness=1.5):
+    """Draw a 3D preview of the cutting board"""
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection='3d')
+
+    current_x = 0
+    for strip in strips:
+        # Define the 6 faces of the rectangular strip
+        x = current_x
+        y = 0
+        z = 0
+        w = strip['width']
+        l = board_length
+        h = board_thickness
+
+        # Vertices of the box
+        vertices = [
+            [x, y, z], [x+w, y, z], [x+w, y+l, z], [x, y+l, z],  # Bottom face
+            [x, y, z+h], [x+w, y, z+h], [x+w, y+l, z+h], [x, y+l, z+h]  # Top face
+        ]
+
+        # Define the 6 faces using vertex indices
+        faces = [
+            [vertices[0], vertices[1], vertices[5], vertices[4]],  # Front
+            [vertices[2], vertices[3], vertices[7], vertices[6]],  # Back
+            [vertices[0], vertices[3], vertices[7], vertices[4]],  # Left
+            [vertices[1], vertices[2], vertices[6], vertices[5]],  # Right
+            [vertices[0], vertices[1], vertices[2], vertices[3]],  # Bottom
+            [vertices[4], vertices[5], vertices[6], vertices[7]]   # Top
+        ]
+
+        # Create the 3D polygon collection
+        face_collection = Poly3DCollection(faces, alpha=0.9, linewidths=1, edgecolors='black')
+        face_collection.set_facecolor(strip['color'])
+        ax.add_collection3d(face_collection)
+
+        current_x += strip['width']
+
+    # Set the aspect ratio and labels
+    ax.set_xlim(0, board_width)
+    ax.set_ylim(0, board_length)
+    ax.set_zlim(0, board_thickness * 2)
+    ax.set_xlabel('Width (inches)', fontsize=10)
+    ax.set_ylabel('Length (inches)', fontsize=10)
+    ax.set_zlabel('Thickness (inches)', fontsize=10)
+    ax.set_title(f'3D Preview - Thickness: {board_thickness}"', fontsize=14, fontweight='bold')
+
+    # Set viewing angle
+    ax.view_init(elev=20, azim=45)
 
     return fig
 
@@ -398,13 +549,30 @@ if uploaded_file is not None:
     except Exception as e:
         st.error(f"Error loading design: {e}")
 
+# Visualization Options
+st.subheader("Visualization Options")
+col_opt1, col_opt2, col_opt3, col_opt4 = st.columns(4)
+
+with col_opt1:
+    show_grain = st.checkbox("Show Wood Grain", value=False)
+
+with col_opt2:
+    corner_radius = st.slider("Corner Radius", min_value=0.0, max_value=2.0, value=0.0, step=0.1)
+
+with col_opt3:
+    board_thickness = st.slider("Board Thickness (in)", min_value=0.5, max_value=3.0, value=1.5, step=0.25)
+
+with col_opt4:
+    view_angle = st.selectbox("3D View Angle", ["Default (45°)", "Top (90°)", "Side (0°)", "Angled (30°)"])
+
 # Main content area
-tab1, tab2 = st.tabs(["📊 Preview", "📐 Schematic"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Edge Grain", "🔄 End Grain", "📦 3D View", "📐 Schematic"])
 
 with tab1:
-    st.subheader("Board Preview")
+    st.subheader("Edge Grain Preview")
     if total_width <= board_width:
-        fig_preview = draw_board_preview(st.session_state.strips, board_width, board_length)
+        fig_preview = draw_board_preview(st.session_state.strips, board_width, board_length,
+                                         show_grain=show_grain, corner_radius=corner_radius)
         st.pyplot(fig_preview)
 
         # Download preview
@@ -412,15 +580,67 @@ with tab1:
         fig_preview.savefig(buf, format='png', dpi=300, bbox_inches='tight')
         buf.seek(0)
         st.download_button(
-            label="📥 Download Preview (PNG)",
+            label="📥 Download Edge Grain Preview (PNG)",
             data=buf,
-            file_name="cutting_board_preview.png",
+            file_name="cutting_board_edge_grain.png",
             mime="image/png"
         )
     else:
         st.error("Total width exceeds board width! Please adjust strip widths.")
 
 with tab2:
+    st.subheader("End Grain Preview")
+    st.info("This shows how the board would look if cut and rotated 90° for an end grain pattern")
+    if total_width <= board_width:
+        fig_end_grain = draw_end_grain_preview(st.session_state.strips, board_width, board_length,
+                                                show_grain=show_grain)
+        st.pyplot(fig_end_grain)
+
+        # Download end grain preview
+        buf = io.BytesIO()
+        fig_end_grain.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+        buf.seek(0)
+        st.download_button(
+            label="📥 Download End Grain Preview (PNG)",
+            data=buf,
+            file_name="cutting_board_end_grain.png",
+            mime="image/png"
+        )
+    else:
+        st.error("Total width exceeds board width! Please adjust strip widths.")
+
+with tab3:
+    st.subheader("3D Preview")
+    if total_width <= board_width:
+        fig_3d = draw_3d_preview(st.session_state.strips, board_width, board_length, board_thickness)
+
+        # Adjust viewing angle based on selection
+        ax_3d = fig_3d.axes[0]
+        if view_angle == "Top (90°)":
+            ax_3d.view_init(elev=90, azim=0)
+        elif view_angle == "Side (0°)":
+            ax_3d.view_init(elev=0, azim=0)
+        elif view_angle == "Angled (30°)":
+            ax_3d.view_init(elev=30, azim=60)
+        else:  # Default
+            ax_3d.view_init(elev=20, azim=45)
+
+        st.pyplot(fig_3d)
+
+        # Download 3D preview
+        buf = io.BytesIO()
+        fig_3d.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+        buf.seek(0)
+        st.download_button(
+            label="📥 Download 3D Preview (PNG)",
+            data=buf,
+            file_name="cutting_board_3d.png",
+            mime="image/png"
+        )
+    else:
+        st.error("Total width exceeds board width! Please adjust strip widths.")
+
+with tab4:
     st.subheader("Dimensioned Schematic")
     if total_width <= board_width:
         fig_schematic = draw_schematic(st.session_state.strips, board_width, board_length)
@@ -464,11 +684,26 @@ with st.expander("ℹ️ How to Use"):
        - ⬆️⬇️ Reorder strips
        - 🗑️ Delete a strip
        - ⚙️ Bulk Edit to change all strips at once
-    7. **Monitor total width** - should not exceed your board width
-    8. **Save your design** - download as JSON to reload later
-    9. **View Preview** to see what your board will look like
-    10. **View Schematic** to get dimensioned drawings for cutting
-    11. **Download** the schematic as PDF or PNG to print
+    7. **Adjust visualization options**:
+       - Show Wood Grain for realistic texture
+       - Corner Radius for rounded edges
+       - Board Thickness for 3D view
+       - 3D View Angle to see different perspectives
+    8. **Monitor total width** - should not exceed your board width
+    9. **Save your design** - download as JSON to reload later
+    10. **Explore different views**:
+        - 📊 Edge Grain - Traditional striped pattern
+        - 🔄 End Grain - Rotated 90° checkerboard style
+        - 📦 3D View - See thickness and depth
+        - 📐 Schematic - Dimensioned cutting guide
+    11. **Download** any view as PDF or PNG to print
+
+    ### Visualization Features
+    - **Edge Grain View**: Shows the board with vertical wood grain (traditional)
+    - **End Grain View**: Shows how it would look rotated 90° for end grain patterns
+    - **3D View**: Interactive 3D preview with adjustable thickness and viewing angles
+    - **Wood Grain Texture**: Toggle realistic wood grain lines for better visualization
+    - **Rounded Corners**: Preview boards with rounded edge profiles
 
     ### Quick Actions
     - **Duplicate Strip**: Click 📋 to copy a strip's settings
@@ -476,11 +711,15 @@ with st.expander("ℹ️ How to Use"):
     - **Bulk Edit**: Use the ⚙️ Bulk Edit tool to change all strips at once
     - **Save/Load**: Save your design and reload it anytime
     - **Unit Toggle**: Switch between inches, cm, and mm instantly
+    - **View Angles**: Change 3D perspective from top, side, or angled views
 
     ### Tips
     - Use contrasting woods for visual appeal (light/dark alternating)
     - Common strip widths: 0.75", 1.0", 1.5", 2.0" (19mm, 25mm, 38mm, 51mm)
     - Popular combinations: Maple + Walnut, Cherry + Maple + Purpleheart
+    - Standard thickness: 1.5" for cutting boards, 0.75" for serving boards
+    - End grain boards are more durable but require more wood and labor
+    - Enable wood grain texture to better visualize the final appearance
     - Remember to account for material loss from planing and sanding
     - Save your designs to build a library of patterns
     """)
