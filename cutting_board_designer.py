@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.backends.backend_pdf import PdfPages
 import io
+import copy
 
 # Wood type library with realistic colors
 WOOD_TYPES = {
@@ -29,6 +30,19 @@ BOARD_PRESETS = {
     "Extra Large (16\" × 24\")": (16, 24),
     "Custom": None
 }
+
+# Unit conversion
+def inches_to_cm(inches):
+    return inches * 2.54
+
+def cm_to_inches(cm):
+    return cm / 2.54
+
+def inches_to_mm(inches):
+    return inches * 25.4
+
+def mm_to_inches(mm):
+    return mm / 25.4
 
 def calculate_total_width(strips):
     """Calculate total width"""
@@ -161,13 +175,39 @@ st.markdown("Design your custom cutting board with different wood types and widt
 # Sidebar for controls
 st.sidebar.header("Design Controls")
 
-# Initialize session state for strips
+# Initialize session state
 if 'strips' not in st.session_state:
     st.session_state.strips = [
         {'wood_type': 'Maple', 'width': 2.0, 'color': WOOD_TYPES['Maple']},
         {'wood_type': 'Walnut', 'width': 1.5, 'color': WOOD_TYPES['Walnut']},
         {'wood_type': 'Maple', 'width': 2.0, 'color': WOOD_TYPES['Maple']},
     ]
+if 'history' not in st.session_state:
+    st.session_state.history = []
+    st.session_state.history_index = -1
+if 'unit' not in st.session_state:
+    st.session_state.unit = "inches"
+
+# Measurement unit selector
+st.sidebar.subheader("Settings")
+unit = st.sidebar.radio(
+    "Measurement Units",
+    options=["inches", "centimeters", "millimeters"],
+    index=["inches", "centimeters", "millimeters"].index(st.session_state.unit),
+    horizontal=True
+)
+st.session_state.unit = unit
+
+# Unit display helper
+def format_dimension(value_in_inches):
+    if st.session_state.unit == "centimeters":
+        return f"{inches_to_cm(value_in_inches):.2f} cm"
+    elif st.session_state.unit == "millimeters":
+        return f"{inches_to_mm(value_in_inches):.1f} mm"
+    else:
+        return f"{value_in_inches:.3f}\""
+
+st.sidebar.markdown("---")
 
 # Board size selection
 st.sidebar.subheader("Board Size")
@@ -224,6 +264,35 @@ while len(st.session_state.strips) > num_strips:
     st.session_state.strips.pop()
 
 st.sidebar.markdown("---")
+st.sidebar.subheader("Strip Tools")
+
+# Bulk edit option
+with st.sidebar.expander("⚙️ Bulk Edit"):
+    bulk_width = st.number_input(
+        "Set all widths to:",
+        min_value=0.25,
+        max_value=float(board_width),
+        value=1.0,
+        step=0.25,
+        key="bulk_width"
+    )
+    if st.button("Apply to All Strips"):
+        for strip in st.session_state.strips:
+            strip['width'] = bulk_width
+        st.rerun()
+
+    bulk_wood = st.selectbox(
+        "Set all wood types to:",
+        options=list(WOOD_TYPES.keys()),
+        key="bulk_wood"
+    )
+    if st.button("Apply Wood to All"):
+        for strip in st.session_state.strips:
+            strip['wood_type'] = bulk_wood
+            strip['color'] = WOOD_TYPES[bulk_wood]
+        st.rerun()
+
+st.sidebar.markdown("---")
 st.sidebar.subheader("Configure Each Strip")
 
 # Configure each strip
@@ -253,6 +322,30 @@ for i in range(num_strips):
         )
         st.session_state.strips[i]['width'] = width
 
+    # Strip action buttons
+    col_a, col_b, col_c, col_d = st.sidebar.columns(4)
+
+    with col_a:
+        if st.button("📋", key=f"duplicate_{i}", help="Duplicate this strip"):
+            new_strip = copy.deepcopy(st.session_state.strips[i])
+            st.session_state.strips.insert(i + 1, new_strip)
+            st.rerun()
+
+    with col_b:
+        if i > 0 and st.button("⬆️", key=f"up_{i}", help="Move up"):
+            st.session_state.strips[i], st.session_state.strips[i-1] = st.session_state.strips[i-1], st.session_state.strips[i]
+            st.rerun()
+
+    with col_c:
+        if i < num_strips - 1 and st.button("⬇️", key=f"down_{i}", help="Move down"):
+            st.session_state.strips[i], st.session_state.strips[i+1] = st.session_state.strips[i+1], st.session_state.strips[i]
+            st.rerun()
+
+    with col_d:
+        if num_strips > 1 and st.button("🗑️", key=f"delete_{i}", help="Delete this strip"):
+            st.session_state.strips.pop(i)
+            st.rerun()
+
     st.sidebar.markdown("")
 
 # Calculate total width
@@ -261,16 +354,49 @@ width_remaining = board_width - total_width
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Summary")
-st.sidebar.metric("Total Width", f"{total_width:.3f}\"")
-st.sidebar.metric("Remaining", f"{width_remaining:.3f}\"")
+st.sidebar.metric("Total Width", format_dimension(total_width))
+st.sidebar.metric("Remaining", format_dimension(width_remaining))
+st.sidebar.metric("Board Size", f"{format_dimension(board_width)} × {format_dimension(board_length)}")
 
 if width_remaining < 0:
-    st.sidebar.error(f"⚠️ Board is {abs(width_remaining):.3f}\" too wide!")
+    st.sidebar.error(f"⚠️ Board is {format_dimension(abs(width_remaining))} too wide!")
 elif width_remaining > 0:
-    st.sidebar.info(f"✓ {width_remaining:.3f}\" of space remaining")
+    st.sidebar.info(f"✓ {format_dimension(width_remaining)} of space remaining")
 else:
     st.sidebar.success("✓ Perfect fit!")
 
+
+# Save/Load Design
+st.sidebar.markdown("---")
+st.sidebar.subheader("Save/Load Design")
+
+# Export design as JSON
+import json
+
+design_data = {
+    'board_width': board_width,
+    'board_length': board_length,
+    'strips': st.session_state.strips
+}
+
+design_json = json.dumps(design_data, indent=2)
+st.sidebar.download_button(
+    label="💾 Save Design (JSON)",
+    data=design_json,
+    file_name="cutting_board_design.json",
+    mime="application/json"
+)
+
+# Load design from JSON
+uploaded_file = st.sidebar.file_uploader("📂 Load Design", type=['json'])
+if uploaded_file is not None:
+    try:
+        loaded_data = json.load(uploaded_file)
+        st.session_state.strips = loaded_data.get('strips', st.session_state.strips)
+        st.success("Design loaded successfully!")
+        st.rerun()
+    except Exception as e:
+        st.error(f"Error loading design: {e}")
 
 # Main content area
 tab1, tab2 = st.tabs(["📊 Preview", "📐 Schematic"])
@@ -328,18 +454,33 @@ with tab2:
 with st.expander("ℹ️ How to Use"):
     st.markdown("""
     ### Instructions
-    1. **Select board size** - choose from presets or use custom dimensions
-    2. **Select number of strips** in the sidebar
-    3. **Choose wood type** for each strip from the dropdown
-    4. **Set width** for each strip (in inches)
-    5. **Monitor total width** - should not exceed your board width
-    6. **View Preview** to see what your board will look like
-    7. **View Schematic** to get dimensioned drawings for cutting
-    8. **Download** the schematic as PDF or PNG to print
+    1. **Select measurement units** - choose inches, centimeters, or millimeters
+    2. **Select board size** - choose from presets or use custom dimensions
+    3. **Select number of strips** in the sidebar
+    4. **Choose wood type** for each strip from the dropdown
+    5. **Set width** for each strip
+    6. **Use strip tools** for quick edits:
+       - 📋 Duplicate a strip
+       - ⬆️⬇️ Reorder strips
+       - 🗑️ Delete a strip
+       - ⚙️ Bulk Edit to change all strips at once
+    7. **Monitor total width** - should not exceed your board width
+    8. **Save your design** - download as JSON to reload later
+    9. **View Preview** to see what your board will look like
+    10. **View Schematic** to get dimensioned drawings for cutting
+    11. **Download** the schematic as PDF or PNG to print
+
+    ### Quick Actions
+    - **Duplicate Strip**: Click 📋 to copy a strip's settings
+    - **Reorder Strips**: Use ⬆️⬇️ to change strip positions
+    - **Bulk Edit**: Use the ⚙️ Bulk Edit tool to change all strips at once
+    - **Save/Load**: Save your design and reload it anytime
+    - **Unit Toggle**: Switch between inches, cm, and mm instantly
 
     ### Tips
     - Use contrasting woods for visual appeal (light/dark alternating)
-    - Common strip widths: 0.75", 1.0", 1.5", 2.0"
+    - Common strip widths: 0.75", 1.0", 1.5", 2.0" (19mm, 25mm, 38mm, 51mm)
     - Popular combinations: Maple + Walnut, Cherry + Maple + Purpleheart
     - Remember to account for material loss from planing and sanding
+    - Save your designs to build a library of patterns
     """)
