@@ -23,14 +23,10 @@ WOOD_TYPES = {
 # Board dimensions
 BOARD_LENGTH = 18  # inches
 BOARD_WIDTH = 12   # inches
-GLUE_LINE_LOSS = 0.0625  # 1/16 inch per glue joint
 
 def calculate_total_width(strips):
-    """Calculate total width including glue line losses"""
+    """Calculate total width"""
     total = sum(strip['width'] for strip in strips)
-    # Add glue line losses (n-1 glue lines for n strips)
-    if len(strips) > 1:
-        total += (len(strips) - 1) * GLUE_LINE_LOSS
     return total
 
 def draw_board_preview(strips):
@@ -64,9 +60,6 @@ def draw_board_preview(strips):
         )
 
         current_x += strip['width']
-        # Add glue line
-        if i < len(strips) - 1:
-            current_x += GLUE_LINE_LOSS
 
     ax.set_xlim(0, BOARD_WIDTH)
     ax.set_ylim(0, BOARD_LENGTH)
@@ -120,12 +113,6 @@ def draw_schematic(strips):
                 f'{strip["width"]}"', ha='center', fontsize=10, fontweight='bold')
 
         current_x += strip['width']
-
-        # Show glue line
-        if i < len(strips) - 1:
-            ax.plot([current_x, current_x], [0, BOARD_LENGTH],
-                   'r--', linewidth=1, alpha=0.5, label='Glue line' if i == 0 else '')
-            current_x += GLUE_LINE_LOSS
 
     # Add overall dimensions
     total_width = calculate_total_width(strips)
@@ -242,7 +229,6 @@ elif width_remaining > 0:
 else:
     st.sidebar.success("✓ Perfect fit!")
 
-st.sidebar.markdown(f"*Includes {len(st.session_state.strips) - 1} glue lines @ {GLUE_LINE_LOSS}\" each*")
 
 # Main content area
 tab1, tab2 = st.tabs(["📊 Preview", "📐 Schematic"])
@@ -309,8 +295,8 @@ with st.expander("ℹ️ How to Use"):
     7. **Download** the schematic as PDF or PNG to print
 
     ### Tips
-    - The app accounts for glue line losses (1/16" per joint)
     - Use contrasting woods for visual appeal (light/dark alternating)
     - Common strip widths: 0.75", 1.0", 1.5", 2.0"
     - Popular combinations: Maple + Walnut, Cherry + Maple + Purpleheart
+    - Remember to account for material loss from planing and sanding
     """)
