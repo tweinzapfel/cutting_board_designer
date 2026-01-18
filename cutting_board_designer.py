@@ -483,17 +483,22 @@ for i in range(num_strips):
             st.rerun()
 
     with col_b:
-        if i > 0 and st.button("⬆️", key=f"up_{i}", help="Move up"):
+        # Show button but disable if it's the first strip
+        if st.button("⬆️", key=f"up_{i}", help="Move up", disabled=(i == 0)):
+            # Swap with previous strip
             st.session_state.strips[i], st.session_state.strips[i-1] = st.session_state.strips[i-1], st.session_state.strips[i]
             st.rerun()
 
     with col_c:
-        if i < num_strips - 1 and st.button("⬇️", key=f"down_{i}", help="Move down"):
+        # Show button but disable if it's the last strip
+        if st.button("⬇️", key=f"down_{i}", help="Move down", disabled=(i == num_strips - 1)):
+            # Swap with next strip
             st.session_state.strips[i], st.session_state.strips[i+1] = st.session_state.strips[i+1], st.session_state.strips[i]
             st.rerun()
 
     with col_d:
-        if num_strips > 1 and st.button("🗑️", key=f"delete_{i}", help="Delete this strip"):
+        # Show button but disable if it's the only strip
+        if st.button("🗑️", key=f"delete_{i}", help="Delete this strip", disabled=(num_strips == 1)):
             st.session_state.strips.pop(i)
             st.rerun()
 
