@@ -453,52 +453,58 @@ for i in range(num_strips):
     col1, col2 = st.sidebar.columns(2)
 
     with col1:
+        # Use the strip's unique ID to ensure stable widgets
+        current_strip = st.session_state.strips[i]
         wood_type = st.selectbox(
             "Wood",
             options=list(WOOD_TYPES.keys()),
-            key=f"wood_{i}",
-            index=list(WOOD_TYPES.keys()).index(st.session_state.strips[i]['wood_type'])
+            key=f"wood_{i}_{id(current_strip)}",
+            index=list(WOOD_TYPES.keys()).index(current_strip['wood_type'])
         )
-        st.session_state.strips[i]['wood_type'] = wood_type
-        st.session_state.strips[i]['color'] = WOOD_TYPES[wood_type]
+        current_strip['wood_type'] = wood_type
+        current_strip['color'] = WOOD_TYPES[wood_type]
 
     with col2:
         width = st.number_input(
             "Width (in)",
             min_value=0.25,
             max_value=float(board_width),
-            value=float(st.session_state.strips[i]['width']),
+            value=float(current_strip['width']),
             step=0.25,
-            key=f"width_{i}"
+            key=f"width_{i}_{id(current_strip)}"
         )
-        st.session_state.strips[i]['width'] = width
+        current_strip['width'] = width
 
     # Strip action buttons
     col_a, col_b, col_c, col_d = st.sidebar.columns(4)
 
     with col_a:
-        if st.button("📋", key=f"duplicate_{i}", help="Duplicate this strip"):
-            new_strip = copy.deepcopy(st.session_state.strips[i])
+        if st.button("📋", key=f"duplicate_{i}_{id(current_strip)}", help="Duplicate this strip"):
+            new_strip = copy.deepcopy(current_strip)
             st.session_state.strips.insert(i + 1, new_strip)
             st.rerun()
 
     with col_b:
         # Show button but disable if it's the first strip
-        if st.button("⬆️", key=f"up_{i}", help="Move up", disabled=(i == 0)):
-            # Swap with previous strip
-            st.session_state.strips[i], st.session_state.strips[i-1] = st.session_state.strips[i-1], st.session_state.strips[i]
+        if st.button("⬆️", key=f"up_{i}_{id(current_strip)}", help="Move up", disabled=(i == 0)):
+            # Swap with previous strip - create temp copy to avoid reference issues
+            temp = st.session_state.strips[i-1]
+            st.session_state.strips[i-1] = st.session_state.strips[i]
+            st.session_state.strips[i] = temp
             st.rerun()
 
     with col_c:
         # Show button but disable if it's the last strip
-        if st.button("⬇️", key=f"down_{i}", help="Move down", disabled=(i == num_strips - 1)):
-            # Swap with next strip
-            st.session_state.strips[i], st.session_state.strips[i+1] = st.session_state.strips[i+1], st.session_state.strips[i]
+        if st.button("⬇️", key=f"down_{i}_{id(current_strip)}", help="Move down", disabled=(i == num_strips - 1)):
+            # Swap with next strip - create temp copy to avoid reference issues
+            temp = st.session_state.strips[i+1]
+            st.session_state.strips[i+1] = st.session_state.strips[i]
+            st.session_state.strips[i] = temp
             st.rerun()
 
     with col_d:
         # Show button but disable if it's the only strip
-        if st.button("🗑️", key=f"delete_{i}", help="Delete this strip", disabled=(num_strips == 1)):
+        if st.button("🗑️", key=f"delete_{i}_{id(current_strip)}", help="Delete this strip", disabled=(num_strips == 1)):
             st.session_state.strips.pop(i)
             st.rerun()
 
