@@ -4,6 +4,7 @@ import matplotlib.patches as patches
 from matplotlib.backends.backend_pdf import PdfPages
 from mpl_toolkits.mplot3d import Axes3D
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import plotly.graph_objects as go
 import io
 import copy
 import numpy as np
@@ -242,6 +243,76 @@ def draw_3d_preview(strips, board_width, board_length, board_thickness=1.5):
 
     # Set viewing angle
     ax.view_init(elev=20, azim=45)
+
+    return fig
+
+def draw_interactive_3d_preview(strips, board_width, board_length, board_thickness=1.5):
+    """Draw an interactive 3D preview using Plotly that can be rotated with mouse"""
+    fig = go.Figure()
+
+    current_x = 0
+    for strip in strips:
+        # Define the 8 vertices of the box
+        x = current_x
+        y = 0
+        z = 0
+        w = strip['width']
+        l = board_length
+        h = board_thickness
+
+        # Create vertices for the box
+        vertices = np.array([
+            [x, y, z], [x+w, y, z], [x+w, y+l, z], [x, y+l, z],  # Bottom face
+            [x, y, z+h], [x+w, y, z+h], [x+w, y+l, z+h], [x, y+l, z+h]  # Top face
+        ])
+
+        # Define the 6 faces using vertex indices
+        faces = [
+            [0, 1, 5, 4],  # Front
+            [2, 3, 7, 6],  # Back
+            [0, 3, 7, 4],  # Left
+            [1, 2, 6, 5],  # Right
+            [0, 1, 2, 3],  # Bottom
+            [4, 5, 6, 7]   # Top
+        ]
+
+        # Create mesh3d for each face to have proper coloring
+        for face_indices in faces:
+            face_vertices = vertices[face_indices]
+
+            # Create a mesh for this face
+            fig.add_trace(go.Mesh3d(
+                x=face_vertices[:, 0],
+                y=face_vertices[:, 1],
+                z=face_vertices[:, 2],
+                color=strip['color'],
+                opacity=0.95,
+                flatshading=True,
+                showlegend=False,
+                hoverinfo='text',
+                text=f"{strip['wood_type']}<br>Width: {strip['width']}\"",
+                i=[0, 0],
+                j=[1, 2],
+                k=[2, 3]
+            ))
+
+        current_x += strip['width']
+
+    # Update layout for better visualization
+    fig.update_layout(
+        title=f'Interactive 3D Preview - Thickness: {board_thickness}" (Click and drag to rotate)',
+        scene=dict(
+            xaxis=dict(title='Width (inches)', range=[0, board_width]),
+            yaxis=dict(title='Length (inches)', range=[0, board_length]),
+            zaxis=dict(title='Thickness (inches)', range=[0, board_thickness]),
+            aspectmode='data',
+            camera=dict(
+                eye=dict(x=1.5, y=1.5, z=0.8)
+            )
+        ),
+        height=700,
+        margin=dict(l=0, r=0, t=40, b=0)
+    )
 
     return fig
 
@@ -637,32 +708,52 @@ with tab2:
 
 with tab3:
     st.subheader("3D Preview")
+    st.info("💡 Click and drag to rotate the 3D view. Use scroll to zoom. Right-click and drag to pan.")
+
     if total_width <= board_width:
-        fig_3d = draw_3d_preview(st.session_state.strips, board_width, board_length, board_thickness)
+        # Create interactive Plotly 3D view
+        fig_interactive = draw_interactive_3d_preview(st.session_state.strips, board_width, board_length, board_thickness)
 
-        # Adjust viewing angle based on selection
-        ax_3d = fig_3d.axes[0]
+        # Adjust camera angle based on selection
         if view_angle == "Top (90°)":
-            ax_3d.view_init(elev=90, azim=0)
+            fig_interactive.update_layout(scene_camera=dict(eye=dict(x=0, y=0, z=2.5)))
         elif view_angle == "Side (0°)":
-            ax_3d.view_init(elev=0, azim=0)
+            fig_interactive.update_layout(scene_camera=dict(eye=dict(x=0, y=2.5, z=0)))
         elif view_angle == "Angled (30°)":
-            ax_3d.view_init(elev=30, azim=60)
+            fig_interactive.update_layout(scene_camera=dict(eye=dict(x=1.8, y=1.8, z=0.6)))
         else:  # Default
-            ax_3d.view_init(elev=20, azim=45)
+            fig_interactive.update_layout(scene_camera=dict(eye=dict(x=1.5, y=1.5, z=0.8)))
 
-        st.pyplot(fig_3d)
+        # Display the interactive plot
+        st.plotly_chart(fig_interactive, use_container_width=True)
 
-        # Download 3D preview
-        buf = io.BytesIO()
-        fig_3d.savefig(buf, format='png', dpi=300, bbox_inches='tight')
-        buf.seek(0)
-        st.download_button(
-            label="📥 Download 3D Preview (PNG)",
-            data=buf,
-            file_name=f"{st.session_state.design_name}_3d.png",
-            mime="image/png"
-        )
+        # Still offer static matplotlib version for download
+        with st.expander("📥 Download Static 3D Image"):
+            fig_3d_static = draw_3d_preview(st.session_state.strips, board_width, board_length, board_thickness)
+
+            # Adjust viewing angle for static version
+            ax_3d = fig_3d_static.axes[0]
+            if view_angle == "Top (90°)":
+                ax_3d.view_init(elev=90, azim=0)
+            elif view_angle == "Side (0°)":
+                ax_3d.view_init(elev=0, azim=0)
+            elif view_angle == "Angled (30°)":
+                ax_3d.view_init(elev=30, azim=60)
+            else:  # Default
+                ax_3d.view_init(elev=20, azim=45)
+
+            st.pyplot(fig_3d_static)
+
+            # Download 3D preview
+            buf = io.BytesIO()
+            fig_3d_static.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+            buf.seek(0)
+            st.download_button(
+                label="📥 Download 3D Preview (PNG)",
+                data=buf,
+                file_name=f"{st.session_state.design_name}_3d.png",
+                mime="image/png"
+            )
     else:
         st.error("Total width exceeds board width! Please adjust strip widths.")
 
@@ -727,7 +818,7 @@ with st.expander("ℹ️ How to Use"):
     ### Visualization Features
     - **Edge Grain View**: Shows the board with vertical wood grain (traditional)
     - **End Grain View**: Shows how it would look rotated 90° for end grain patterns
-    - **3D View**: Interactive 3D preview with adjustable thickness and viewing angles
+    - **3D View**: Fully interactive 3D preview - click and drag to rotate, scroll to zoom, right-click to pan
     - **Wood Grain Texture**: Toggle realistic wood grain lines for better visualization
     - **Rounded Corners**: Preview boards with rounded edge profiles
 
@@ -738,6 +829,7 @@ with st.expander("ℹ️ How to Use"):
     - **Save/Load**: Save your design and reload it anytime
     - **Unit Toggle**: Switch between inches, cm, and mm instantly
     - **View Angles**: Change 3D perspective from top, side, or angled views
+    - **Interactive 3D**: Use your mouse to explore the board from any angle in real-time
 
     ### Tips
     - Use contrasting woods for visual appeal (light/dark alternating)
