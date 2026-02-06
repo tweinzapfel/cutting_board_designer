@@ -35,6 +35,85 @@ BOARD_PRESETS = {
     "Custom": None
 }
 
+# Pattern presets (wood_type, width in inches)
+PATTERN_PRESETS = {
+    "Custom Design": None,
+    "Classic Alternating": [
+        ('Maple', 1.5),
+        ('Walnut', 1.5),
+        ('Maple', 1.5),
+        ('Walnut', 1.5),
+        ('Maple', 1.5),
+        ('Walnut', 1.5)
+    ],
+    "Bold Stripes": [
+        ('Walnut', 2.0),
+        ('Maple', 2.0),
+        ('Walnut', 2.0),
+        ('Maple', 2.0),
+        ('Walnut', 2.0)
+    ],
+    "Accent Stripe": [
+        ('Walnut', 2.5),
+        ('Maple', 0.5),
+        ('Cherry', 1.5),
+        ('Maple', 0.5),
+        ('Walnut', 2.5)
+    ],
+    "Butcher Block": [
+        ('Maple', 1.75),
+        ('Maple', 1.75),
+        ('Maple', 1.75),
+        ('Maple', 1.75),
+        ('Maple', 1.75)
+    ],
+    "Rainbow": [
+        ('Maple', 1.2),
+        ('Yellowheart', 1.2),
+        ('Padauk', 1.2),
+        ('Purpleheart', 1.2),
+        ('Cherry', 1.2),
+        ('Walnut', 1.2)
+    ],
+    "Dark & Light": [
+        ('Wenge', 1.0),
+        ('Maple', 1.0),
+        ('Wenge', 1.0),
+        ('Maple', 1.0),
+        ('Wenge', 1.0),
+        ('Maple', 1.0),
+        ('Wenge', 1.0)
+    ],
+    "Centerpiece": [
+        ('Walnut', 2.0),
+        ('Maple', 1.0),
+        ('Purpleheart', 1.5),
+        ('Maple', 1.0),
+        ('Walnut', 2.0)
+    ],
+    "Exotic Mix": [
+        ('Cherry', 1.5),
+        ('Padauk', 1.0),
+        ('Maple', 1.5),
+        ('Purpleheart', 1.0),
+        ('Yellowheart', 1.5),
+        ('Walnut', 1.5)
+    ],
+    "Minimalist": [
+        ('White Oak', 3.0),
+        ('Walnut', 1.5),
+        ('White Oak', 3.0)
+    ],
+    "Gradient": [
+        ('Maple', 1.2),
+        ('Yellowheart', 1.2),
+        ('Cherry', 1.2),
+        ('Padauk', 1.2),
+        ('Walnut', 1.2),
+        ('Wenge', 1.2)
+    ]
+}
+
 # Unit conversion
 def inches_to_cm(inches):
     return inches * 2.54
@@ -52,6 +131,23 @@ def calculate_total_width(strips):
     """Calculate total width"""
     total = sum(strip['width'] for strip in strips)
     return total
+
+def apply_pattern_preset(pattern_name):
+    """Apply a pattern preset to the strips"""
+    if pattern_name == "Custom Design" or PATTERN_PRESETS[pattern_name] is None:
+        return
+
+    pattern = PATTERN_PRESETS[pattern_name]
+    st.session_state.strips = []
+
+    for wood_type, width in pattern:
+        st.session_state.strips.append({
+            'wood_type': wood_type,
+            'width': width,
+            'color': WOOD_TYPES[wood_type]
+        })
+
+    st.rerun()
 
 def add_wood_grain_texture(ax, x, y, width, height, color, orientation='vertical'):
     """Add wood grain texture effect to a rectangle"""
@@ -472,6 +568,27 @@ else:
 
 st.sidebar.markdown("---")
 
+# Pattern presets
+st.sidebar.subheader("Pattern Presets")
+selected_pattern = st.sidebar.selectbox(
+    "Choose a Pattern",
+    options=list(PATTERN_PRESETS.keys()),
+    index=0,
+    help="Select a pre-designed pattern to get started quickly"
+)
+
+if st.sidebar.button("🎨 Apply Pattern", use_container_width=True):
+    apply_pattern_preset(selected_pattern)
+
+# Show pattern preview info
+if selected_pattern != "Custom Design" and PATTERN_PRESETS[selected_pattern] is not None:
+    pattern_info = PATTERN_PRESETS[selected_pattern]
+    total_pattern_width = sum(width for _, width in pattern_info)
+    num_woods = len(set(wood for wood, _ in pattern_info))
+    st.sidebar.caption(f"📏 Pattern width: {total_pattern_width}\" | 🌲 {num_woods} wood types")
+
+st.sidebar.markdown("---")
+
 # Number of strips
 num_strips = st.sidebar.number_input(
     "Number of strips",
@@ -793,10 +910,14 @@ with st.expander("ℹ️ How to Use"):
     ### Instructions
     1. **Select measurement units** - choose inches, centimeters, or millimeters
     2. **Select board size** - choose from presets or use custom dimensions
-    3. **Select number of strips** in the sidebar
-    4. **Choose wood type** for each strip from the dropdown
-    5. **Set width** for each strip
-    6. **Use strip tools** for quick edits:
+    3. **Choose a pattern preset** (optional) - start with professionally designed patterns:
+       - Classic Alternating, Bold Stripes, Rainbow, Centerpiece, and more
+       - Or select "Custom Design" to create your own from scratch
+       - Click "🎨 Apply Pattern" to load the pattern
+    4. **Select number of strips** in the sidebar
+    5. **Choose wood type** for each strip from the dropdown
+    6. **Set width** for each strip
+    7. **Use strip tools** for quick edits:
        - 📋 Duplicate a strip
        - ⬆️⬇️ Reorder strips
        - 🗑️ Delete a strip
@@ -823,6 +944,7 @@ with st.expander("ℹ️ How to Use"):
     - **Rounded Corners**: Preview boards with rounded edge profiles
 
     ### Quick Actions
+    - **Pattern Presets**: Instantly load professional designs with one click
     - **Duplicate Strip**: Click 📋 to copy a strip's settings
     - **Reorder Strips**: Use ⬆️⬇️ to change strip positions
     - **Bulk Edit**: Use the ⚙️ Bulk Edit tool to change all strips at once
@@ -832,6 +954,7 @@ with st.expander("ℹ️ How to Use"):
     - **Interactive 3D**: Use your mouse to explore the board from any angle in real-time
 
     ### Tips
+    - **New to design?** Start with a pattern preset and customize from there
     - Use contrasting woods for visual appeal (light/dark alternating)
     - Common strip widths: 0.75", 1.0", 1.5", 2.0" (19mm, 25mm, 38mm, 51mm)
     - Popular combinations: Maple + Walnut, Cherry + Maple + Purpleheart
@@ -840,4 +963,5 @@ with st.expander("ℹ️ How to Use"):
     - Enable wood grain texture to better visualize the final appearance
     - Remember to account for material loss from planing and sanding
     - Save your designs to build a library of patterns
+    - Try different presets to discover new pattern ideas and combinations
     """)
